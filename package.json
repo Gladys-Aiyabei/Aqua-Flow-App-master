@@ -1,0 +1,31 @@
+{
+  "name": "mobile",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "@expo/vector-icons": "^15.0.2",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.26",
+    "expo-constants": "~57.0.20",
+    "expo-font": "~57.0.4",
+    "expo-status-bar": "~57.0.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-web": "^0.21.2"
+  },
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web --localhost --clear",
+    "mock-api": "node server.js",
+    "lint": "expo lint"
+  },
+  "private": true,
+  "devDependencies": {
+    "eslint": "^9.0.0",
+    "eslint-config-expo": "~57.0.2"
+  }
+}
