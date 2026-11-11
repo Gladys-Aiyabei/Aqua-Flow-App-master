@@ -30,7 +30,7 @@ AquaFlow is a React Native + Expo app for managing water distribution operations
 
 ## Prerequisites
 
-- Node.js 18+
+- Node.js 20.19.4+
 - npm
 - A browser such as Chrome
 
@@ -58,6 +58,30 @@ npm run mock-api
 The mock API listens on:
 
 - http://localhost:4000
+
+## Database (Supabase)
+
+All data is stored in PostgreSQL, hosted on [Supabase](https://supabase.com). The app talks to `server.js`, and only the server connects to the database.
+
+1. Create a Supabase project.
+2. Copy `.env.local.example` to `.env.local` and set `DATABASE_URL` to the **Session pooler** connection string from Supabase (Connect button). Also set `STAFF_PIN`.
+3. Create the tables: paste `supabase/migrations/20261111000000_aquaflow_schema.sql` into the Supabase SQL Editor and run it (optionally `supabase/seed.sql` for demo data), or run `npm run db:setup -- --seed`.
+4. Start the server with `npm run server`. It prints `database connected` when it works.
+
+Row Level Security is enabled on every table with no policies, so the public Supabase API keys can't read or change the data.
+
+## M-Pesa payments with PayHero
+
+Payment prompts go through [PayHero](https://docs.payhero.co.ke). Without PayHero keys the server runs in test mode and approves payments automatically after about 6 seconds.
+
+To take real payments:
+
+1. Copy `.env.local.example` to `.env.local` (it is git-ignored).
+2. Fill in your PayHero auth token (or API username and password) and your payment channel ID.
+3. Optionally set `PAYHERO_CALLBACK_URL` to a public HTTPS address ending in `/api/payhero/callback`.
+4. Restart the server with `npm run mock-api`. It logs `M-Pesa: PayHero live` when the keys are picked up.
+
+The keys stay on the server; the app never sees them. Results are always confirmed with PayHero's status API, so a fake callback can't mark an order as paid.
 
 ## Demo login
 

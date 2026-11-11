@@ -50,8 +50,8 @@ export default function SettingsSheet({ visible, onClose }) {
           <Field label="Reconciliation variance limit %" keyboardType="numeric" value={form.varianceThresholdPercent} onChangeText={set('varianceThresholdPercent')} />
           <Text style={[type.bodySm, { marginTop: -10 }]}>Daily stock differences above this need a written explanation.</Text>
           <Text style={type.bodySm}>
-            M-Pesa mode: <Text style={{ fontWeight: '700', color: s?.mpesaMode === 'live' ? colors.mintDeep : colors.amber }}>{s?.mpesaMode === 'live' ? 'Live (Daraja)' : 'Simulation'}</Text>.
-            {' '}Daraja keys are configured on the server in server/.env.
+            M-Pesa mode: <Text style={{ fontWeight: '700', color: s?.mpesaMode === 'live' ? colors.mintDeep : colors.amber }}>{s?.mpesaMode === 'live' ? 'Live (PayHero)' : 'Simulation'}</Text>.
+            {' '}PayHero keys are set on the server in .env.local.
           </Text>
         </>
       ) : (

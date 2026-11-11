@@ -37,7 +37,7 @@ export default function MpesaScreen() {
             <View style={styles.walletIcon}><Ionicons name="wallet" size={18} color={colors.onPrimary} /></View>
             <Text style={styles.caption}>SAFARICOM M-PESA TILL</Text>
           </View>
-          <Badge label={settings.mpesaMode === 'live' ? 'Live · Direct settle' : 'Test mode'} color={colors.mintDeep} bg={settings.mpesaMode === 'live' ? '#7BF5BC' : '#FFE7A8'} />
+          <Badge label={settings.mpesaMode === 'live' ? 'Live · PayHero' : 'Test mode'} color={colors.mintDeep} bg={settings.mpesaMode === 'live' ? '#7BF5BC' : '#FFE7A8'} />
         </View>
         <View style={ui.between}>
           <View>
