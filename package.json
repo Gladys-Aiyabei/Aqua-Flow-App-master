@@ -9,6 +9,7 @@
     "expo-constants": "~57.0.20",
     "expo-font": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "pg": "^8.23.1",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -21,11 +22,16 @@
     "ios": "expo start --ios",
     "web": "expo start --web --localhost --clear",
     "mock-api": "node server.js",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "server": "node server.js",
+    "db:setup": "node scripts/db-setup.js"
   },
   "private": true,
   "devDependencies": {
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2"
+  },
+  "engines": {
+    "node": ">=20.19.4"
   }
 }

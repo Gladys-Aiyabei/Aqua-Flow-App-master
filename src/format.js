@@ -62,6 +62,9 @@ export const STATUS = {
 };
 export const statusOf = (s) => STATUS[s] ?? { label: s, color: colors.textMuted, bg: colors.surfaceMid };
 
+/** Accepts 0712 345 678, 712345678, +254712345678 or 254712345678 (also 01xx numbers). */
+export const isValidKenyanPhone = (p) => /^(?:0|254)?[17]\d{8}$/.test(String(p || '').replace(/[\s+-]/g, ''));
+
 /** 254712345678 -> "0712 345 678" for editable phone fields. */
 export function localPhone(p) {
   const s = String(p || '');

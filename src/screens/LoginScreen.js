@@ -5,6 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useApp } from '../AppContext';
 import { colors, radius, space, type } from '../theme';
 import { Button, Card, Field, Segmented } from '../components/ui';
+import { isValidKenyanPhone } from '../format';
 
 export default function LoginScreen() {
   const { apiUrl, signIn } = useApp();
@@ -19,6 +20,12 @@ export default function LoginScreen() {
   const [error, setError] = useState('');
 
   const submit = async () => {
+    if (busy) return;
+    const problem = role === 'staff'
+      ? (!pin.trim() ? 'Enter your staff PIN.' : '')
+      : name.trim().length < 2 ? 'Enter your name.'
+        : !isValidKenyanPhone(phone) ? 'Enter a valid Safaricom number, e.g. 0712 345 678.' : '';
+    if (problem) { setError(problem); return; }
     setBusy(true); setError('');
     try {
       await signIn(url, role, role === 'staff' ? { pin, name: name || undefined } : { name, phone });
