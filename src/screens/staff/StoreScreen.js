@@ -13,7 +13,7 @@ const LOW_STOCK = 20;
 const ACCENT = { new: colors.primary, confirmed: colors.primaryDeep, dispatched: colors.cyan, delivered: colors.mintDeep, cancelled: colors.danger };
 
 export default function StoreScreen() {
-  const { data, act } = useApp();
+  const { data, act, isAdmin } = useApp();
   const [filter, setFilter] = useState('open');
   const [productForm, setProductForm] = useState(null);
   const [restock, setRestock] = useState(null);
@@ -51,7 +51,7 @@ export default function StoreScreen() {
         </View>
       </Hero>
 
-      <SectionHeader title="Packaged Water Store" subtitle="Live hub inventory" icon="cube" action="Add product" onAction={() => setProductForm({})} />
+      <SectionHeader title="Packaged Water Store" subtitle={isAdmin ? 'Live hub inventory' : 'Live inventory · prices set by the admin'} icon="cube" action={isAdmin ? 'Add product' : undefined} onAction={() => setProductForm({})} />
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 16 }} style={{ marginHorizontal: -16, paddingLeft: 16 }}>
         {products.map((p) => {
           const low = p.stock < LOW_STOCK;
@@ -59,7 +59,7 @@ export default function StoreScreen() {
             <Card key={p.id} style={[styles.product, !p.active && { opacity: 0.5 }]}>
               <View style={ui.between}>
                 <Badge label={`${p.stock} in stock`} color={low ? colors.danger : colors.mintDeep} bg={low ? colors.dangerSoft : colors.mintSoft} />
-                <IconButton icon="options-outline" label="Edit product" onPress={() => setProductForm(p)} />
+                {isAdmin ? <IconButton icon="options-outline" label="Edit product" onPress={() => setProductForm(p)} /> : null}
               </View>
               <View style={styles.bottle}>
                 <Ionicons name="water" size={42} color={colors.primary} />

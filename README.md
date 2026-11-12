@@ -4,71 +4,69 @@ AquaFlow is a React Native + Expo app for managing water distribution operations
 
 ## Features
 
-- Customer login and ordering flow
-- Water product catalog and refill/new bottle selection
-- Order checkout with M-Pesa style payment flow
-- Staff dashboard for stock, tanks, fleet, M-Pesa, reconciliation, and feedback
-- Auto-refreshing live state from the configured server
-- Browser-friendly Expo web support
+- **Accounts:** customers sign up (name, email, M-Pesa phone, password, delivery area), then log in with email and password.
+- **Roles, enforced on the server:**
+  - **Admin:** sees every branch; manages branches, staff, products, prices and settings; sees earnings and the activity log.
+  - **Staff:** created by the admin and assigned to one branch (e.g. DIS-1). They only see and change that branch's orders, tanker missions, tanks, tankers, payments and reconciliations.
+  - **Customer:** orders bottled water or a tanker, pays by M-Pesa, tracks deliveries and leaves feedback. Sees only their own records.
+- **Admin dashboard:** earnings today / 7 days / month / all time, by branch and by payment type, a 14-day chart, open work, and a full activity log.
+- **M-Pesa through PayHero** (test mode without keys).
+- **Data in Supabase (PostgreSQL)**, with the API running as a Netlify Function on the same site.
 
-## Tech stack
+## Security
 
-- React Native
-- Expo SDK 57
-- Expo Router-compatible app shell structure
-- React Native Web
-- Local mock API for browser testing
+- Passwords are hashed with scrypt. Sign-in tokens are random and stored only as SHA-256 hashes; sessions expire after 30 days of inactivity.
+- Five wrong passwords lock that email for 15 minutes (plus a per-IP limit). Login errors don't reveal whether an email exists.
+- New staff get a temporary password and must set their own before doing anything else. Changing a password signs out other devices.
+- Deactivating an account, resetting its password or changing its role or branch signs it out immediately.
+- Every action is checked on the server (role and branch), and every change is written to the activity log.
+- Row Level Security is on for all tables and the public Supabase keys have no access; only the API's connection string can read data.
+- The API only accepts browser requests from the site itself (plus `ALLOWED_ORIGINS`). Netlify adds security headers (no framing, no sniffing, HSTS).
 
 ## Project structure
 
-- `App.js` — app entry, auth gate, and role-specific shell
-- `src/AppContext.js` — session, auth, polling, cached state
-- `src/api.js` — API URL and HTTP client logic
-- `src/components/` — reusable UI and sheets
-- `src/screens/` — customer and staff screens
-- `server.js` — local mock backend used when the real API is unavailable
+- `App.js`: sign-up/login flow and the admin, staff and customer apps
+- `src/AppContext.js`: session, polling, the admin's branch filter
+- `src/screens/auth/`: sign-up, login and change-password pages (aqua scene background)
+- `src/screens/admin/`: dashboard and team management
+- `src/screens/staff/`, `src/screens/customer/`: operations and customer screens
+- `server/api.mjs`: the API (one handler used locally and on Netlify)
+- `server.js`: local development server
+- `netlify/functions/api.mjs`, `netlify.toml`: Netlify Function and build settings
+- `supabase/migrations/`, `supabase/seed.sql`: database schema and demo data
+- `scripts/`: `db-setup.js` (create tables) and `create-admin.js` (first admin)
 
 ## Prerequisites
 
-- Node.js 20.19.4+
-- npm
-- A browser such as Chrome
+- Node.js 20.19.4+ (Expo SDK 57)
+- A Supabase project
 
-## Run the app in Chrome
+## Go live on Netlify + Supabase
+
+1. **Create the tables:** in Supabase, open the SQL Editor and run each file in `supabase/migrations/` in order. Optionally run `supabase/seed.sql` for demo branches and data. Or run `npm run db:setup -- --seed` locally once `DATABASE_URL` is in `.env.local`.
+2. **Create the first admin** (locally, with `DATABASE_URL` in `.env.local`):
+   ```bash
+   npm run create-admin -- --email you@yourcompany.co.ke --name "Your Name"
+   ```
+3. **Netlify environment variables** (Site configuration > Environment variables, scope: Functions):
+   - `DATABASE_URL`: the Supabase **Transaction pooler** connection string (port 6543)
+   - `APP_TIMEZONE`: `Africa/Nairobi`
+   - PayHero keys (optional): `PAYHERO_AUTH_TOKEN`, `PAYHERO_CHANNEL_ID`
+4. **Deploy:** connect the GitHub repository in Netlify. `netlify.toml` builds the web app and the API function automatically.
+5. Log in as the admin, add branches (Team > Branches), then add staff (Team > Add staff member).
+
+The Supabase integration's `SUPABASE_*` variables aren't used: the API needs the Postgres connection string in `DATABASE_URL`.
+
+## Run locally
 
 ```bash
 npm install
-npm run web
+cp .env.local.example .env.local   # then fill in DATABASE_URL
+npm run db:setup -- --seed
+npm run create-admin -- --email admin@example.com --name "Admin"
+npm run server                     # API on http://localhost:4000
+npm run web                        # app in the browser
 ```
-
-This starts the Expo web server and opens the app in the browser at:
-
-- http://localhost:8083
-
-If a port is unavailable, Expo will automatically choose the next available one.
-
-## Start the mock backend API
-
-This project includes a local mock API so the app can be demoed without the external AquaFlow server.
-
-```bash
-npm run mock-api
-```
-
-The mock API listens on:
-
-- http://localhost:4000
-
-## Database (Supabase)
-
-All data is stored in PostgreSQL, hosted on [Supabase](https://supabase.com). The app talks to `server.js`, and only the server connects to the database.
-
-1. Create a Supabase project.
-2. Copy `.env.local.example` to `.env.local` and set `DATABASE_URL` to the **Session pooler** connection string from Supabase (Connect button). Also set `STAFF_PIN`.
-3. Create the tables: paste `supabase/migrations/20261111000000_aquaflow_schema.sql` into the Supabase SQL Editor and run it (optionally `supabase/seed.sql` for demo data), or run `npm run db:setup -- --seed`.
-4. Start the server with `npm run server`. It prints `database connected` when it works.
-
-Row Level Security is enabled on every table with no policies, so the public Supabase API keys can't read or change the data.
 
 ## M-Pesa payments with PayHero
 
@@ -79,35 +77,17 @@ To take real payments:
 1. Copy `.env.local.example` to `.env.local` (it is git-ignored).
 2. Fill in your PayHero auth token (or API username and password) and your payment channel ID.
 3. Optionally set `PAYHERO_CALLBACK_URL` to a public HTTPS address ending in `/api/payhero/callback`.
-4. Restart the server with `npm run mock-api`. It logs `M-Pesa: PayHero live` when the keys are picked up.
+4. Restart the server (`npm run server`), or redeploy on Netlify after adding the keys as environment variables.
 
 The keys stay on the server; the app never sees them. Results are always confirmed with PayHero's status API, so a fake callback can't mark an order as paid.
-
-## Demo login
-
-Customer example:
-
-- Name: `Grace Wanjiku`
-- Phone: `0712345678`
-
-Staff example:
-
-- Name: `Operations Manager`
-- PIN: `1234`
 
 ## Available scripts
 
 ```bash
-npm start
-npm run web
-npm run mock-api
-npx expo start --android
-npx expo start --ios
-npx expo lint
+npm run server          # local API
+npm run web             # Expo web dev server
+npm run build:web       # production web build (what Netlify runs)
+npm run db:setup        # create tables (add -- --seed for demo data)
+npm run create-admin    # create or reset an admin account
+npm run lint
 ```
-
-## Notes
-
-- The browser app is intentionally resilient when the backend is offline.
-- If the backend server is down, the app will show a connection error rather than crashing.
-- The project is structured for Expo web compatibility, which is why it can run in Chrome as a web app.

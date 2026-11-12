@@ -151,6 +151,7 @@ function Metric({ label, value, sub }) {
 }
 
 function TankSheet({ tank, onClose, act }) {
+  const { isAdmin } = useApp();
   const isNew = tank && !tank.id;
   const [form, setForm] = useState({});
   const [key, setKey] = useState(null);
@@ -175,7 +176,7 @@ function TankSheet({ tank, onClose, act }) {
     <Sheet visible={Boolean(tank)} onClose={onClose} title={isNew ? 'Add tank' : 'Edit tank'}
       footer={<View style={{ gap: 8 }}>
         <Button title={isNew ? 'Add tank' : 'Save changes'} icon="checkmark" onPress={save} />
-        {!isNew ? <Button title="Delete tank" icon="trash-outline" variant="danger" onPress={remove} /> : null}
+        {!isNew && isAdmin ? <Button title="Delete tank" icon="trash-outline" variant="danger" onPress={remove} /> : null}
       </View>}>
       <Field label="Name" placeholder="Reservoir Alpha" value={form.name} onChangeText={set('name')} />
       <Field label="Location" placeholder="Borehole feeder, Nyali" value={form.location} onChangeText={set('location')} />
