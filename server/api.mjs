@@ -161,6 +161,15 @@ const normalizeEmail = (v) => {
 
 const ACTIVE_MISSION = ['scheduled', 'filling', 'en_route', 'discharging'];
 
+/** Optional pinned location from the app: both numbers or neither. */
+function pinFrom(body) {
+  if (body.latitude === undefined && body.longitude === undefined) return { latitude: null, longitude: null };
+  const lat = Number(body.latitude);
+  const lng = Number(body.longitude);
+  if (!(Number.isFinite(lat) && Number.isFinite(lng) && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180)) fail(400, 'That location could not be read. Try "Use my current location" again.');
+  return { latitude: Math.round(lat * 1e6) / 1e6, longitude: Math.round(lng * 1e6) / 1e6 };
+}
+
 // ---------- passwords & sign-in limits ----------
 
 const scrypt = (password, salt, N) => new Promise((resolve, reject) => {
@@ -816,10 +825,12 @@ async function route(ctx) {
         items.push({ product, qty, refill, unitPrice: refill ? product.refill_price : product.price });
       }
       const total = items.reduce((s, i) => s + i.qty * i.unitPrice, 0);
+      const pin = pinFrom(body);
+      const paymentMethod = body.paymentMethod === 'cash' ? 'cash' : 'mpesa';
       const o = await one(c, `
-        insert into orders (customer_name, customer_phone, customer_id, branch_id, address, notes, total)
-        values ($1, $2, $3, $4, $5, $6, $7) returning *`,
-      [customerName, customerPhone, customerId, branchId, address, text(body.notes, 300), total]);
+        insert into orders (customer_name, customer_phone, customer_id, branch_id, address, notes, total, payment_method, latitude, longitude)
+        values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) returning *`,
+      [customerName, customerPhone, customerId, branchId, address, text(body.notes, 300), total, paymentMethod, pin.latitude, pin.longitude]);
       for (const i of items) {
         await c.query('insert into order_items (order_id, product_id, name, qty, unit_price, refill) values ($1, $2, $3, $4, $5, $6)',
           [o.id, i.product.id, i.product.name, i.qty, i.unitPrice, i.refill]);
@@ -1077,7 +1088,7 @@ async function route(ctx) {
       const { bulk_price_per_litre: price } = await one(c, 'select bulk_price_per_litre from settings where id');
       const d = {
         destination, volume_l: volumeL, notes: text(body.notes, 300), amount: Math.round(volumeL * price), status: 'requested',
-        truck_id: null, source_tank_id: null,
+        truck_id: null, source_tank_id: null, ...pinFrom(body),
       };
       if (sess.role === 'customer') {
         Object.assign(d, { customer_name: sess.name, customer_phone: sess.phone, customer_id: sess.userId });

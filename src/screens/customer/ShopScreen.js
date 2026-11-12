@@ -3,18 +3,25 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { notify, useApp } from '../../AppContext';
 import { colors, radius, shadowStrong, space, type } from '../../theme';
-import { kes } from '../../format';
-import { Badge, Button, Card, Empty, Field, Hero, Screen, SectionHeader, Sheet, Stepper, ui } from '../../components/ui';
+import { isValidKenyanPhone, kes, localPhone } from '../../format';
+import { Badge, Button, Card, ChoiceGrid, Empty, Field, Hero, Screen, SectionHeader, Sheet, Stepper, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
 import DeliveryAreaCard, { useDeliveryArea } from '../../components/DeliveryAreaCard';
+import LocationPicker from '../../components/LocationPicker';
 
 export default function ShopScreen({ goToOrders }) {
-  const { data, session, act } = useApp();
+  const { data, session, act, api } = useApp();
   const [cart, setCart] = useState({}); // productId -> { qty, refill }
   const [checkout, setCheckout] = useState(false);
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [paying, setPaying] = useState(null);
+  const [spot, setSpot] = useState(null); // { latitude, longitude } from "Use my location"
+  const [payMethod, setPayMethod] = useState('mpesa');
+  const [payPhone, setPayPhone] = useState('');
+  const [placing, setPlacing] = useState(false);
+  const [formError, setFormError] = useState('');
+  const [paying, setPaying] = useState(null); // { order, payment, error }
+  const [snap, setSnap] = useState({ lines: [], total: 0 }); // what the checkout shows, frozen while it's open
   const { hasArea } = useDeliveryArea();
 
   const products = data?.products ?? [];
@@ -26,14 +33,40 @@ export default function ShopScreen({ goToOrders }) {
 
   const lastAddress = data?.orders?.[0]?.address;
 
+  const openCheckout = () => {
+    if (!hasArea) { notify('Choose your delivery area', 'Pick your area at the top of this screen, then check out.'); return; }
+    setAddress((a) => a || lastAddress || '');
+    setPayPhone((p) => p || localPhone(session?.phone));
+    setFormError('');
+    setSnap({ lines, total });
+    setCheckout(true);
+  };
+
   const placeOrder = async () => {
-    const order = await act((api) => api.post('/api/orders', {
-      address, notes, items: lines.map((l) => ({ productId: l.p.id, qty: l.qty, refill: l.refill })),
+    if (placing) return;
+    if (!address.trim() && !spot) { setFormError('Add your delivery address or use your location.'); return; }
+    if (payMethod === 'mpesa' && !isValidKenyanPhone(payPhone)) { setFormError('Enter the M-Pesa number to charge, e.g. 0712 345 678.'); return; }
+    setFormError(''); setPlacing(true);
+    const order = await act((a) => a.post('/api/orders', {
+      address: address.trim() || 'Pinned location', notes, paymentMethod: payMethod, ...(spot ?? {}),
+      items: snap.lines.map((l) => ({ productId: l.p.id, qty: l.qty, refill: l.refill })),
     }));
-    if (order) {
-      setCart({}); setCheckout(false); setNotes('');
-      setPaying(order);
+    if (!order) { setPlacing(false); return; }
+    setCart({}); setCheckout(false); setNotes(''); setSpot(null);
+    if (payMethod === 'cash') {
+      setPlacing(false);
+      notify('Order placed', `Order ${order.id} is on its way to the team. Pay ${kes(order.total)} in cash when it arrives.`);
+      goToOrders?.();
+      return;
     }
+    // M-Pesa: send the PIN prompt straight away, then show the waiting screen.
+    try {
+      const res = await api.post('/api/payments/stk', { orderId: order.id, phone: payPhone });
+      setPaying({ order, payment: res.payment });
+    } catch (e) {
+      setPaying({ order, payment: null, error: e.message });
+    }
+    setPlacing(false);
   };
 
   return (
@@ -93,17 +126,18 @@ export default function ShopScreen({ goToOrders }) {
             <Text style={type.bodySm}>{count} item{count > 1 ? 's' : ''}</Text>
             <Text style={[type.headline, type.num]}>{kes(total)}</Text>
           </View>
-          <Button title="Checkout" icon="arrow-forward" onPress={() => {
-            if (!hasArea) { notify('Choose your delivery area', 'Pick your area at the top of this screen, then check out.'); return; }
-            setAddress((a) => a || lastAddress || ''); setCheckout(true);
-          }} />
+          <Button title="Checkout" icon="arrow-forward" onPress={openCheckout} />
         </View>
       ) : null}
 
-      <Sheet visible={checkout} onClose={() => setCheckout(false)} title="Checkout" subtitle="Pay with M-Pesa after placing your order"
-        footer={<Button title={`Place order · ${kes(total)}`} icon="checkmark" variant="mpesa" onPress={placeOrder} disabled={!address.trim() || !count} />}>
+      <Sheet visible={checkout} onClose={() => setCheckout(false)} title="Checkout" subtitle="Where to deliver, and how you'll pay"
+        footer={<View style={{ gap: 6 }}>
+          {formError ? <Text style={{ color: colors.danger, textAlign: 'center' }}>{formError}</Text> : null}
+          <Button title={payMethod === 'mpesa' ? `Pay ${kes(snap.total)} with M-Pesa` : `Place order · ${kes(snap.total)}`}
+            icon={payMethod === 'mpesa' ? 'phone-portrait' : 'checkmark'} variant="mpesa" onPress={placeOrder} loading={placing} disabled={!snap.lines.length} />
+        </View>}>
         <View style={ui.inset}>
-          {lines.map((l) => (
+          {snap.lines.map((l) => (
             <View key={l.p.id} style={ui.between}>
               <Text style={[type.body, { flex: 1 }]}>{l.qty}× {l.p.name}{l.refill && l.p.refillPrice ? ' (refill)' : ''}</Text>
               <Text style={[type.label, type.num]}>{kes(l.qty * priceOf(l.p, l.refill))}</Text>
@@ -111,19 +145,39 @@ export default function ShopScreen({ goToOrders }) {
           ))}
           <View style={[ui.between, { borderTopWidth: 1, borderTopColor: colors.divider, paddingTop: 8 }]}>
             <Text style={type.title}>Total</Text>
-            <Text style={[type.title, type.num, { color: colors.primaryDeep }]}>{kes(total)}</Text>
+            <Text style={[type.title, type.num, { color: colors.primaryDeep }]}>{kes(snap.total)}</Text>
           </View>
         </View>
+        <Text style={type.caption}>Delivery</Text>
         <Field label="Delivery address" placeholder="Estate, street, house / gate number" value={address} onChangeText={setAddress} />
+        <LocationPicker value={spot} onChange={setSpot} />
         <Field label="Notes for the rider (optional)" placeholder="Call when at the gate" value={notes} onChangeText={setNotes} />
+
+        <Text style={type.caption}>Payment</Text>
+        <ChoiceGrid columns={2} value={payMethod} onChange={setPayMethod} options={[
+          { value: 'mpesa', label: 'M-Pesa', sub: 'PIN prompt on phone' },
+          { value: 'cash', label: 'Cash', sub: 'Pay on delivery' },
+        ]} />
+        {payMethod === 'mpesa' ? (
+          <View style={styles.payBox}>
+            <Field label="M-Pesa number to charge" placeholder="0712 345 678" keyboardType="phone-pad" value={payPhone} onChangeText={setPayPhone} />
+            <Text style={type.bodySm}>
+              We will send an M-Pesa prompt to this number for {kes(snap.total)}. Enter your PIN on the phone to pay Till {data?.settings?.tillNumber}.
+            </Text>
+          </View>
+        ) : (
+          <Text style={type.bodySm}>Pay the rider when your water arrives. You can still pay by M-Pesa later from My Orders.</Text>
+        )}
       </Sheet>
 
       <PaymentSheet
         visible={Boolean(paying)}
         onClose={() => { setPaying(null); goToOrders?.(); }}
-        target={paying ? { orderId: paying.id, amount: paying.total, description: `Order ${paying.id}` } : null}
-        defaultPhone={session?.phone}
-        title="Order placed! Pay now"
+        target={paying ? { orderId: paying.order.id, amount: paying.order.total, description: `Order ${paying.order.id}` } : null}
+        startedPayment={paying?.payment ?? undefined}
+        startError={paying?.error}
+        defaultPhone={payPhone}
+        title="Order placed: pay with M-Pesa"
       />
     </View>
   );
@@ -132,6 +186,7 @@ export default function ShopScreen({ goToOrders }) {
 const styles = StyleSheet.create({
   hello: { color: colors.cyanSoft, fontSize: 15, fontWeight: '600' },
   heroTitle: { color: colors.onPrimary, fontSize: 26, fontWeight: '800', letterSpacing: -0.6, maxWidth: 280 },
+  payBox: { gap: 8, padding: 12, borderRadius: radius.md, backgroundColor: colors.mintSoft },
   bottle: { width: 76, height: 86, borderRadius: radius.lg, backgroundColor: colors.surfaceLow, alignItems: 'center', justifyContent: 'center' },
   size: { fontSize: 11, fontWeight: '700', color: colors.primaryDeep, marginTop: 2 },
   toggle: { flexDirection: 'row', backgroundColor: colors.surfaceMid, borderRadius: radius.sm, padding: 3 },

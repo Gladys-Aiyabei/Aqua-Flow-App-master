@@ -3,7 +3,7 @@ import { Linking, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { confirm, useApp } from '../../AppContext';
 import { colors, radius, type } from '../../theme';
-import { isToday, kes, prettyPhone, timeAgo } from '../../format';
+import { isToday, kes, mapsUrl, prettyPhone, timeAgo } from '../../format';
 import {
   Badge, Button, Card, Empty, Field, Hero, HeroStat, IconButton, InfoRow, Screen, SectionHeader, Segmented, Sheet, Stepper, Toggle, ui,
 } from '../../components/ui';
@@ -114,8 +114,12 @@ export default function StoreScreen() {
               </View>
             ))}
           </View>
-          <InfoRow icon="location">{o.address}</InfoRow>
+          <View style={[ui.between, { gap: 8 }]}>
+            <View style={{ flex: 1 }}><InfoRow icon={o.latitude ? 'location' : 'location-outline'}>{o.address}{o.latitude ? ' · pinned' : ''}</InfoRow></View>
+            {mapsUrl(o) ? <Button small variant="ghost" title="Navigate" icon="navigate" onPress={() => Linking.openURL(mapsUrl(o))} /> : null}
+          </View>
           {o.customerPhone ? <InfoRow icon="call">{prettyPhone(o.customerPhone)}</InfoRow> : null}
+          {o.paymentStatus !== 'paid' && o.paymentMethod === 'cash' ? <InfoRow icon="cash" color={colors.amber}>Collect {kes(o.total)} cash on delivery</InfoRow> : null}
           {o.rider ? <InfoRow icon="bicycle">Rider: {o.rider}</InfoRow> : null}
           {o.mpesaRef ? <Badge status="paid" icon="checkmark-circle" label={`M-Pesa ${o.mpesaRef}`} /> : null}
 

@@ -29,7 +29,13 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "AquaFlow uses your location to pin where your water should be delivered."
+        }
+      ]
     ]
   }
 }

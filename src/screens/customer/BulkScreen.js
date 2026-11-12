@@ -5,6 +5,7 @@ import { colors, type } from '../../theme';
 import { kes, litres, timeAgo } from '../../format';
 import { Badge, Button, Card, ChoiceGrid, Field, Hero, InfoRow, Screen, SectionHeader, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
+import LocationPicker from '../../components/LocationPicker';
 import DeliveryAreaCard, { useDeliveryArea } from '../../components/DeliveryAreaCard';
 
 const STEPS = [
@@ -21,14 +22,15 @@ export default function BulkScreen() {
   const [volume, setVolume] = useState(10000);
   const [destination, setDestination] = useState('');
   const [notes, setNotes] = useState('');
+  const [spot, setSpot] = useState(null);
   const [paying, setPaying] = useState(null);
   const { hasArea } = useDeliveryArea();
   const price = data?.settings?.bulkPricePerLitre ?? 0;
   const mine = data?.deliveries ?? [];
 
   const submit = async () => {
-    const d = await act((api) => api.post('/api/deliveries', { volumeL: volume, destination, notes }), 'Request sent! We will assign a tanker shortly.');
-    if (d) { setNotes(''); }
+    const d = await act((api) => api.post('/api/deliveries', { volumeL: volume, destination, notes, ...(spot ?? {}) }), 'Request sent! We will assign a tanker shortly.');
+    if (d) { setNotes(''); setSpot(null); }
   };
 
   return (
@@ -51,6 +53,7 @@ export default function BulkScreen() {
         ]} />
         <Field label="Or enter litres" keyboardType="numeric" value={String(volume || '')} onChangeText={(v) => setVolume(Number(v.replace(/\D/g, '')) || 0)} />
         <Field label="Delivery location" placeholder="Site / estate, road, landmark" value={destination} onChangeText={setDestination} />
+        <LocationPicker value={spot} onChange={setSpot} />
         <Field label="Notes (optional)" placeholder="Tank height, gate, preferred time" value={notes} onChangeText={setNotes} />
         <View style={[ui.inset, ui.between, { backgroundColor: colors.mintSoft }]}>
           <Text style={type.body}>Estimated cost</Text>

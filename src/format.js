@@ -85,3 +85,11 @@ export function prettyDate(key) {
 
 /** Signed litres, e.g. "+1,200 L" / "−3,000 L". */
 export const signedLitres = (n) => `${n > 0 ? '+' : n < 0 ? '−' : ''}${group(Math.abs(n))} L`;
+
+/** Google Maps link for a delivery: turn-by-turn directions to the pin, or a search for the address. No API key needed. */
+export function mapsUrl({ latitude, longitude, address } = {}) {
+  if (Number.isFinite(Number(latitude)) && Number.isFinite(Number(longitude)) && latitude !== null && longitude !== null) {
+    return `https://www.google.com/maps/dir/?api=1&destination=${Number(latitude)},${Number(longitude)}`;
+  }
+  return address ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}` : null;
+}

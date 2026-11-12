@@ -3,7 +3,7 @@ import { Linking, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { confirm, useApp } from '../../AppContext';
 import { colors, radius, type } from '../../theme';
-import { compactLitres, formatNumber, isToday, kes, litres, localPhone, statusOf, timeAgo } from '../../format';
+import { compactLitres, formatNumber, isToday, kes, litres, localPhone, mapsUrl, statusOf, timeAgo } from '../../format';
 import {
   Badge, Button, Card, ChoiceGrid, Empty, Field, Hero, HeroStat, IconButton, InfoRow, Screen, SectionHeader, Segmented, Sheet, ui,
 } from '../../components/ui';
@@ -94,7 +94,12 @@ export default function FleetScreen() {
                 </View>
 
                 <View style={ui.inset}>
-                  <InfoRow icon="location">{d.destination}</InfoRow>
+                  <View style={[ui.between, { gap: 8 }]}>
+                    <View style={{ flex: 1 }}><InfoRow icon={d.latitude ? 'location' : 'location-outline'}>{d.destination}{d.latitude ? ' · pinned' : ''}</InfoRow></View>
+                    {mapsUrl({ ...d, address: d.destination }) ? (
+                      <Button small variant="ghost" title="Navigate" icon="navigate" onPress={() => Linking.openURL(mapsUrl({ ...d, address: d.destination }))} />
+                    ) : null}
+                  </View>
                   {truck ? <InfoRow icon="bus">{truck.unit} · {truck.plate} · {truck.driverName}</InfoRow> : <InfoRow icon="alert-circle" color={colors.amber}>No tanker assigned yet</InfoRow>}
                   {d.notes ? <InfoRow icon="document-text">{d.notes}</InfoRow> : null}
                   {stepIndex >= 0 ? (
