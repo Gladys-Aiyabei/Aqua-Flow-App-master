@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Text, View } from 'react-native';
-import { useApp } from '../../AppContext';
+import { notify, useApp } from '../../AppContext';
 import { colors, type } from '../../theme';
-import { kes, litres, timeAgo } from '../../format';
+import { isValidKenyanPhone, kes, litres, localPhone, timeAgo } from '../../format';
 import { Badge, Button, Card, ChoiceGrid, Field, Hero, InfoRow, Screen, SectionHeader, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
 import LocationPicker from '../../components/LocationPicker';
@@ -19,8 +19,11 @@ const STEPS = [
 ];
 
 export default function BulkScreen() {
-  const { data, session, act } = useApp();
+  const { data, session, act, api } = useApp();
   const [volume, setVolume] = useState(10000);
+  const [payMethod, setPayMethod] = useState('mpesa');
+  const [payPhone, setPayPhone] = useState(() => localPhone(session?.phone));
+  const [sending, setSending] = useState(false);
   const [destination, setDestination] = useState('');
   const [notes, setNotes] = useState('');
   const [spot, setSpot] = useState(null);
@@ -31,8 +34,28 @@ export default function BulkScreen() {
   const mine = data?.deliveries ?? [];
 
   const submit = async () => {
-    const d = await act((api) => api.post('/api/deliveries', { volumeL: volume, destination, notes, ...(spot ?? {}) }), 'Request sent! We will assign a tanker shortly.');
-    if (d) { setNotes(''); setSpot(null); }
+    if (sending) return;
+    if (!hasArea) { notify('Choose your delivery area', 'Pick your area in the card above first.'); return; }
+    if (!(volume >= 500)) { notify('How much water?', 'Tanker deliveries start at 500 litres.'); return; }
+    if (!destination.trim() && !spot) { notify('Where to deliver?', 'Type the site or estate, or tap "Use my current location".'); return; }
+    if (payMethod === 'mpesa' && !isValidKenyanPhone(payPhone)) { notify('M-Pesa number needed', 'Enter the number to charge, e.g. 0712 345 678.'); return; }
+    setSending(true);
+    const d = await act((a) => a.post('/api/deliveries', { volumeL: volume, destination: destination.trim() || 'Pinned location', notes, ...(spot ?? {}) }));
+    if (!d) { setSending(false); return; }
+    setNotes(''); setSpot(null); setShowMap(false);
+    if (payMethod === 'later') {
+      setSending(false);
+      notify('Request sent', `Tanker ${d.id} is with the team. You can pay ${kes(d.amount)} by M-Pesa from here or My Orders any time.`);
+      return;
+    }
+    // Pay now: send the M-Pesa prompt straight away.
+    try {
+      const res = await api.post('/api/payments/stk', { deliveryId: d.id, phone: payPhone });
+      setPaying({ delivery: d, payment: res.payment });
+    } catch (e) {
+      setPaying({ delivery: d, payment: null, error: e.message });
+    }
+    setSending(false);
   };
 
   return (
@@ -65,8 +88,21 @@ export default function BulkScreen() {
           <Text style={type.body}>Estimated cost</Text>
           <Text style={[type.headline, type.num, { color: colors.mintDeep }]}>{kes(volume * price)}</Text>
         </View>
-        <Button title="Request tanker delivery" icon="bus" onPress={submit} disabled={!hasArea || !destination.trim() || volume < 500} />
-        {!hasArea ? <Text style={[type.bodySm, { textAlign: 'center' }]}>Choose your delivery area above first.</Text> : null}
+
+        <Text style={type.caption}>Payment</Text>
+        <ChoiceGrid columns={2} value={payMethod} onChange={setPayMethod} options={[
+          { value: 'mpesa', label: 'Pay now', sub: 'M-Pesa PIN prompt' },
+          { value: 'later', label: 'Pay later', sub: 'From My Orders' },
+        ]} />
+        {payMethod === 'mpesa' ? (
+          <View style={{ gap: 8, padding: 12, borderRadius: 12, backgroundColor: colors.mintSoft }}>
+            <Field label="M-Pesa number to charge" placeholder="0712 345 678" keyboardType="phone-pad" value={payPhone} onChangeText={setPayPhone} />
+            <Text style={type.bodySm}>We will send an M-Pesa prompt for {kes(volume * price)} to this number. Enter your PIN to pay Till {data?.settings?.tillNumber}.</Text>
+          </View>
+        ) : null}
+        <Button title={payMethod === 'mpesa' ? `Request & pay ${kes(volume * price)}` : 'Request tanker delivery'}
+          icon={payMethod === 'mpesa' ? 'phone-portrait' : 'bus'} variant={payMethod === 'mpesa' ? 'mpesa' : 'primary'} onPress={submit} loading={sending} />
+        {!hasArea ? <Text style={[type.bodySm, { textAlign: 'center', color: colors.amber }]}>Choose your delivery area above first.</Text> : null}
       </Card>
 
       {mine.length ? <SectionHeader title="My tanker deliveries" icon="bus" /> : null}
@@ -96,15 +132,16 @@ export default function BulkScreen() {
               <Text style={[type.title, type.num]}>{kes(d.amount)}</Text>
               {d.paymentStatus === 'paid'
                 ? <Badge status="paid" icon="checkmark-circle" label={`Paid · ${d.mpesaRef ?? ''}`} />
-                : d.status !== 'cancelled' ? <Button small title="Pay with M-Pesa" icon="phone-portrait" variant="mpesa" onPress={() => setPaying(d)} /> : null}
+                : d.status !== 'cancelled' ? <Button small title={`Pay ${kes(d.amount)}`} icon="phone-portrait" variant="mpesa" onPress={() => setPaying({ delivery: d })} /> : null}
             </View>
           </Card>
         );
       })}
 
       <PaymentSheet visible={Boolean(paying)} onClose={() => setPaying(null)}
-        target={paying ? { deliveryId: paying.id, amount: paying.amount, description: `Tanker ${paying.id}` } : null}
-        defaultPhone={session?.phone} />
+        target={paying ? { deliveryId: paying.delivery.id, amount: paying.delivery.amount, description: `Tanker ${paying.delivery.id}` } : null}
+        startedPayment={paying?.payment ?? undefined} startError={paying?.error}
+        defaultPhone={payPhone} title="Pay for your tanker" />
     </Screen>
   );
 }

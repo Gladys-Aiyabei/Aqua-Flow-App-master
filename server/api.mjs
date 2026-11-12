@@ -274,8 +274,14 @@ const viewBranch = (sess, ctx) => (sess.role === 'staff' ? sess.branchId : ctx.u
 /** Branch for a new record made by the team. */
 async function targetBranch(sess, ctx, body, db = pool) {
   if (sess.role === 'staff') return sess.branchId;
-  const id = text(body?.branchId) || ctx.url.searchParams.get('branchId');
-  if (!id) fail(400, 'Choose a branch first (use the branch picker at the top).');
+  let id = text(body?.branchId) || ctx.url.searchParams.get('branchId');
+  if (!id) {
+    // Admin on "All branches": use the only branch if there is just one, otherwise ask.
+    const list = await rows(db, 'select id from branches where active order by code');
+    if (list.length === 0) fail(400, 'Add a branch first: Team > Branches > Add branch (e.g. DIS-1).');
+    if (list.length > 1) fail(400, 'Pick the branch at the top of the screen (DIS-1, DIS-2, ...) first, then try again.');
+    id = list[0].id;
+  }
   if (!(await one(db, 'select 1 from branches where id = $1', [id]))) fail(400, 'That branch does not exist.');
   return id;
 }
