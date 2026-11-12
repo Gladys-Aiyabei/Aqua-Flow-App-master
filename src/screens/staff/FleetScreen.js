@@ -226,7 +226,7 @@ function MissionSheet({ mission, onClose }) {
 }
 
 function TruckSheet({ truck, onClose }) {
-  const { act } = useApp();
+  const { act, isAdmin } = useApp();
   const isNew = truck && !truck.id;
   const [form, setForm] = useState({});
   const [key, setKey] = useState(null);
@@ -248,7 +248,7 @@ function TruckSheet({ truck, onClose }) {
     <Sheet visible={Boolean(truck)} onClose={onClose} title={isNew ? 'Add tanker' : `Edit ${truck?.unit ?? ''}`}
       footer={<View style={{ gap: 8 }}>
         <Button title="Save" icon="checkmark" onPress={save} />
-        {!isNew ? <Button title="Remove tanker" variant="danger" icon="trash-outline" onPress={remove} /> : null}
+        {!isNew && isAdmin ? <Button title="Remove tanker" variant="danger" icon="trash-outline" onPress={remove} /> : null}
       </View>}>
       <View style={[ui.row, { gap: 8 }]}>
         <Field style={{ flex: 1 }} label="Unit name" placeholder="Unit 11" value={form.unit} onChangeText={set('unit')} />

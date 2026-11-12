@@ -14,6 +14,7 @@
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
     "react-native-web": "^0.21.2"
   },
   "scripts": {
@@ -24,7 +25,9 @@
     "mock-api": "node server.js",
     "lint": "expo lint",
     "server": "node server.js",
-    "db:setup": "node scripts/db-setup.js"
+    "db:setup": "node scripts/db-setup.js",
+    "create-admin": "node scripts/create-admin.js",
+    "build:web": "expo export --platform web"
   },
   "private": true,
   "devDependencies": {
@@ -33,5 +36,6 @@
   },
   "engines": {
     "node": ">=20.19.4"
-  }
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

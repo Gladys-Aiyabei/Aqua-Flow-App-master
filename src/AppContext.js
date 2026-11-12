@@ -3,7 +3,7 @@ import { Alert, AppState, Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createApi, defaultApiUrl } from './api';
 
-const KEYS = { apiUrl: 'aquaflow.apiUrl', session: 'aquaflow.session', cache: 'aquaflow.cache' };
+const KEYS = { apiUrl: 'aquaflow.apiUrl', session: 'aquaflow.session.v2', cache: 'aquaflow.cache.v2', branch: 'aquaflow.viewBranch' };
 const POLL_MS = 8000;
 const browserWindow = typeof window !== 'undefined' ? window : null;
 
@@ -27,25 +27,37 @@ export function confirm(title, message, confirmLabel = 'Yes') {
 export function AppProvider({ children }) {
   const [booting, setBooting] = useState(true);
   const [apiUrl, setApiUrlState] = useState(defaultApiUrl());
-  const [session, setSession] = useState(null); // { token, role, name, phone? }
+  const [session, setSession] = useState(null); // { token, id, email, name, phone, role, branchId, mustChangePassword }
   const [data, setData] = useState(null);
   const [online, setOnline] = useState(true);
   const [lastSync, setLastSync] = useState(null);
+  const [viewBranchId, setViewBranchIdState] = useState(null); // admin's branch filter (null = all)
   const sessionRef = useRef(null);
   useEffect(() => { sessionRef.current = session; }, [session]);
 
-  const api = useMemo(() => createApi(apiUrl, session?.token), [apiUrl, session?.token]);
+  // The admin's branch filter is sent with every request; changing it rebuilds `api`, which restarts polling below.
+  const api = useMemo(() => {
+    const query = session?.role === 'admin' && viewBranchId ? { branchId: viewBranchId } : {};
+    return createApi(apiUrl, session?.token, () => query);
+  }, [apiUrl, session?.token, session?.role, viewBranchId]);
 
   useEffect(() => {
     (async () => {
       try {
-        const [[, url], [, sess], [, cache]] = await AsyncStorage.multiGet([KEYS.apiUrl, KEYS.session, KEYS.cache]);
-        if (url) setApiUrlState(url);
+        const [[, url], [, sess], [, cache], [, branch]] = await AsyncStorage.multiGet([KEYS.apiUrl, KEYS.session, KEYS.cache, KEYS.branch]);
+        // A deployed website always talks to its own server; a saved address only matters in development.
+        if (url && defaultApiUrl().startsWith('http://')) setApiUrlState(url);
         if (sess) setSession(JSON.parse(sess));
         if (cache) setData(JSON.parse(cache));
+        if (branch) setViewBranchIdState(branch);
       } catch { /* first launch */ }
       setBooting(false);
     })();
+  }, []);
+
+  const saveSession = useCallback(async (sess) => {
+    setSession(sess);
+    if (sess) await AsyncStorage.setItem(KEYS.session, JSON.stringify(sess));
   }, []);
 
   const signOut = useCallback(async () => {
@@ -53,44 +65,33 @@ export function AppProvider({ children }) {
     if (current) createApi(apiUrl, current.token).post('/api/auth/logout').catch(() => {});
     setSession(null);
     setData(null);
-    await AsyncStorage.multiRemove([KEYS.session, KEYS.cache]);
+    setViewBranchIdState(null);
+    await AsyncStorage.multiRemove([KEYS.session, KEYS.cache, KEYS.branch]);
   }, [apiUrl]);
 
-  const switchApiUrl = useCallback((url) => {
-    setApiUrlState(url);
-    AsyncStorage.setItem(KEYS.apiUrl, url).catch(() => {});
-  }, []);
-
   const refresh = useCallback(async () => {
-    if (!sessionRef.current) return;
-    const apply = (state) => {
+    const sess = sessionRef.current;
+    if (!sess || sess.mustChangePassword) return;
+    try {
+      const state = await api.get('/api/state');
       setData(state);
       setOnline(true);
       setLastSync(new Date());
-      AsyncStorage.setItem(KEYS.cache, JSON.stringify(state)).catch(() => {});
-    };
-    try {
-      apply(await api.get('/api/state'));
-    } catch (e) {
-      if (e.status === 401) return signOut();
-      // The computer's Wi-Fi IP often changes between sessions; if the saved server address
-      // is unreachable, try the address of the machine currently serving the app.
-      const fallback = defaultApiUrl();
-      if (e.status === 0 && fallback !== apiUrl) {
-        try {
-          apply(await createApi(fallback, sessionRef.current.token).get('/api/state'));
-          switchApiUrl(fallback);
-          return undefined;
-        } catch { /* fall through to offline */ }
+      // Pick up role / branch changes made by the admin.
+      if (state.me && (state.me.role !== sess.role || state.me.branchId !== sess.branchId || state.me.name !== sess.name)) {
+        saveSession({ ...sess, ...state.me });
       }
+      AsyncStorage.setItem(KEYS.cache, JSON.stringify(state)).catch(() => {});
+    } catch (e) {
+      if (e.status === 401) { signOut(); return; }
+      if (e.status === 403 && /new password/i.test(e.message)) { saveSession({ ...sess, mustChangePassword: true }); return; }
       setOnline(false);
     }
-    return undefined;
-  }, [api, apiUrl, signOut, switchApiUrl]);
+  }, [api, signOut, saveSession]);
 
   // Keep data live: refresh on sign-in, every few seconds, and when the app returns to the foreground.
   useEffect(() => {
-    if (!session) return undefined;
+    if (!session || session.mustChangePassword) return undefined;
     // refresh() only sets state after the network request resolves, so this doesn't cascade renders.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refresh();
@@ -102,23 +103,28 @@ export function AppProvider({ children }) {
     return () => { clearInterval(timer); sub.remove(); };
   }, [session, refresh]);
 
-  const signIn = useCallback(async (url, role, credentials) => {
-    let cleanUrl = url.trim().replace(/\/$/, '');
-    let res;
-    try {
-      res = await createApi(cleanUrl, null).post(`/api/auth/${role}`, credentials);
-    } catch (e) {
-      // Saved address unreachable (e.g. the computer's IP changed): retry on the current dev machine.
-      const fallback = defaultApiUrl();
-      if (e.status !== 0 || fallback === cleanUrl) throw e;
-      res = await createApi(fallback, null).post(`/api/auth/${role}`, credentials);
-      cleanUrl = fallback;
-    }
-    const sess = { token: res.token, role: res.role, name: res.name, phone: res.phone };
-    await AsyncStorage.multiSet([[KEYS.apiUrl, cleanUrl], [KEYS.session, JSON.stringify(sess)]]);
-    setApiUrlState(cleanUrl);
+  const publicApi = useMemo(() => createApi(apiUrl, null), [apiUrl]);
+
+  const signIn = useCallback(async (email, password, url) => {
+    const base = (url || apiUrl).trim().replace(/\/$/, '');
+    const res = await createApi(base, null).post('/api/auth/login', { email, password });
+    if (base !== apiUrl) { setApiUrlState(base); AsyncStorage.setItem(KEYS.apiUrl, base).catch(() => {}); }
+    const { token, ...user } = res;
     setData(null);
-    setSession(sess);
+    await saveSession({ token, ...user });
+    return user;
+  }, [apiUrl, saveSession]);
+
+  const signUp = useCallback((details, url) => createApi((url || apiUrl).trim().replace(/\/$/, ''), null).post('/api/auth/signup', details), [apiUrl]);
+
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    await api.post('/api/auth/password', { currentPassword, newPassword });
+    await saveSession({ ...sessionRef.current, mustChangePassword: false });
+  }, [api, saveSession]);
+
+  const setViewBranchId = useCallback((id) => {
+    setViewBranchIdState(id || null);
+    if (id) AsyncStorage.setItem(KEYS.branch, id).catch(() => {}); else AsyncStorage.removeItem(KEYS.branch).catch(() => {});
   }, []);
 
   /** Runs a mutation, shows any error, then refreshes everything. Resolves to the result or null. */
@@ -134,10 +140,13 @@ export function AppProvider({ children }) {
     }
   }, [api, refresh]);
 
+  const role = session?.role;
   const value = useMemo(() => ({
-    booting, apiUrl, session, data, online, lastSync, api, refresh, signIn, signOut, act,
-    isStaff: session?.role === 'staff',
-  }), [booting, apiUrl, session, data, online, lastSync, api, refresh, signIn, signOut, act]);
+    booting, apiUrl, setApiUrl: setApiUrlState, session, data, online, lastSync, api, publicApi, refresh, signIn, signUp, signOut,
+    changePassword, act, viewBranchId, setViewBranchId,
+    isAdmin: role === 'admin',
+    isStaff: role === 'staff' || role === 'admin', // the operations team (staff screens)
+  }), [booting, apiUrl, session, data, online, lastSync, api, publicApi, refresh, signIn, signUp, signOut, changePassword, act, viewBranchId, setViewBranchId, role]);
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }

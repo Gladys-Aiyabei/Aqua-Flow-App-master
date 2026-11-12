@@ -1,5 +1,11 @@
--- Optional demo data for AquaFlow. Run after the schema migration.
+-- Optional demo data for AquaFlow. Run after ALL files in supabase/migrations.
 -- Safe to re-run: existing rows with the same IDs are left alone.
+-- No user accounts are created here: create the first admin with `npm run create-admin`.
+
+insert into branches (id, code, name, area) values
+  ('branch-1', 'DIS-1', 'Nyali route', 'Nyali, Bamburi'),
+  ('branch-2', 'DIS-2', 'Mtwapa route', 'Mtwapa, Kikambala')
+on conflict (id) do nothing;
 
 update settings set
   company_name = 'AquaFlow', hub_name = 'Nyali Hub', till_number = '1234', support_phone = '254700123456',
@@ -54,6 +60,16 @@ insert into reconciliations (id, tank_id, tank_name, date, opening_l, received_l
   ('REC-1001', 'tank-1', 'Reservoir Alpha', ((now() at time zone 'Africa/Nairobi') - interval '1 day')::date, 16000, 0, 3000, 0, 13000, 11500,
    -1500, -11.5, true, 'Meter fault', 'Pump readings differ from reserve forecast.', 'Operations Manager', now() - interval '1 day')
 on conflict (id) do nothing;
+
+-- Assign the demo records to their branch.
+update tanks set branch_id = 'branch-1' where id = 'tank-1' and branch_id is null;
+update tanks set branch_id = 'branch-2' where id = 'tank-2' and branch_id is null;
+update trucks set branch_id = 'branch-1' where id = 'truck-1' and branch_id is null;
+update trucks set branch_id = 'branch-2' where id = 'truck-2' and branch_id is null;
+update orders set branch_id = 'branch-1' where id = 'ORD-1001' and branch_id is null;
+update deliveries set branch_id = 'branch-1' where id = 'BLK-1001' and branch_id is null;
+update feedback set branch_id = 'branch-1' where id = 'FB-1001' and branch_id is null;
+update reconciliations set branch_id = 'branch-1' where id = 'REC-1001' and branch_id is null;
 
 -- Make sure new IDs start after the seeded ...-1001 records.
 select setval('aquaflow_id_seq', greatest(1001, (select last_value from aquaflow_id_seq)));

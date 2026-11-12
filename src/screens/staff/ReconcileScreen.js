@@ -6,7 +6,7 @@ import { dateKey, litres, prettyDate, signedLitres, timeAgo } from '../../format
 import { Badge, Button, Card, Empty, Hero, HeroStat, InfoRow, Screen, SectionHeader, Segmented, ui } from '../../components/ui';
 
 export default function ReconcileScreen() {
-  const { data, act, api, refresh } = useApp();
+  const { data, act, api, refresh, isAdmin } = useApp();
   const [date, setDate] = useState(dateKey(0));
   const [filter, setFilter] = useState('all');
   const [autoRunning, setAutoRunning] = useState(false);
@@ -130,7 +130,8 @@ export default function ReconcileScreen() {
           {r.revisions?.length ? <InfoRow icon="git-branch">Edited {r.revisions.length}× (earlier versions kept)</InfoRow> : null}
           {r.flagged ? (r.reviewedBy
             ? <Badge status="paid" icon="shield-checkmark" label={`Signed off by ${r.reviewedBy}`} />
-            : <Button small title="Supervisor sign-off" icon="shield-checkmark" variant="outline" onPress={() => review(r)} />) : null}
+            : isAdmin ? <Button small title="Supervisor sign-off" icon="shield-checkmark" variant="outline" onPress={() => review(r)} />
+              : <Badge label="Awaiting admin sign-off" icon="time" color={colors.amber} bg={colors.amberSoft} />) : null}
         </Card>
       ))}
 
