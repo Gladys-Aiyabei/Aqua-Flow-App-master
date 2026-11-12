@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useApp } from '../../AppContext';
+import { notify, useApp } from '../../AppContext';
 import { colors, radius, shadowStrong, space, type } from '../../theme';
 import { kes } from '../../format';
 import { Badge, Button, Card, Empty, Field, Hero, Screen, SectionHeader, Sheet, Stepper, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
+import DeliveryAreaCard, { useDeliveryArea } from '../../components/DeliveryAreaCard';
 
 export default function ShopScreen({ goToOrders }) {
   const { data, session, act } = useApp();
@@ -14,6 +15,7 @@ export default function ShopScreen({ goToOrders }) {
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
   const [paying, setPaying] = useState(null);
+  const { hasArea } = useDeliveryArea();
 
   const products = data?.products ?? [];
   const priceOf = (p, refill) => (refill && p.refillPrice ? p.refillPrice : p.price);
@@ -45,6 +47,8 @@ export default function ShopScreen({ goToOrders }) {
             <Badge label={`Lipa na M-Pesa · Till ${data?.settings?.tillNumber ?? ''}`} icon="phone-portrait" color={colors.onPrimary} bg="rgba(0,168,107,0.55)" />
           </View>
         </Hero>
+
+        <DeliveryAreaCard />
 
         <SectionHeader title="Packaged water" subtitle="Choose new bottles or refills" icon="water" />
         {products.length === 0 ? <Empty title="Shop is restocking" text="Please check back shortly." /> : null}
@@ -89,7 +93,10 @@ export default function ShopScreen({ goToOrders }) {
             <Text style={type.bodySm}>{count} item{count > 1 ? 's' : ''}</Text>
             <Text style={[type.headline, type.num]}>{kes(total)}</Text>
           </View>
-          <Button title="Checkout" icon="arrow-forward" onPress={() => { setAddress((a) => a || lastAddress || ''); setCheckout(true); }} />
+          <Button title="Checkout" icon="arrow-forward" onPress={() => {
+            if (!hasArea) { notify('Choose your delivery area', 'Pick your area at the top of this screen, then check out.'); return; }
+            setAddress((a) => a || lastAddress || ''); setCheckout(true);
+          }} />
         </View>
       ) : null}
 

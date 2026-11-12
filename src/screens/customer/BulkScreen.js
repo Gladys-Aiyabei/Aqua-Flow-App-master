@@ -5,6 +5,7 @@ import { colors, type } from '../../theme';
 import { kes, litres, timeAgo } from '../../format';
 import { Badge, Button, Card, ChoiceGrid, Field, Hero, InfoRow, Screen, SectionHeader, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
+import DeliveryAreaCard, { useDeliveryArea } from '../../components/DeliveryAreaCard';
 
 const STEPS = [
   { key: 'requested', label: 'Requested' },
@@ -21,6 +22,7 @@ export default function BulkScreen() {
   const [destination, setDestination] = useState('');
   const [notes, setNotes] = useState('');
   const [paying, setPaying] = useState(null);
+  const { hasArea } = useDeliveryArea();
   const price = data?.settings?.bulkPricePerLitre ?? 0;
   const mine = data?.deliveries ?? [];
 
@@ -37,6 +39,8 @@ export default function BulkScreen() {
         <Text style={{ color: colors.cyanSoft }}>KES {price} per litre · treated & metered delivery</Text>
       </Hero>
 
+      <DeliveryAreaCard />
+
       <Card>
         <Text style={type.title}>Request a tanker</Text>
         <Text style={type.caption}>How much water?</Text>
@@ -52,7 +56,8 @@ export default function BulkScreen() {
           <Text style={type.body}>Estimated cost</Text>
           <Text style={[type.headline, type.num, { color: colors.mintDeep }]}>{kes(volume * price)}</Text>
         </View>
-        <Button title="Request tanker delivery" icon="bus" onPress={submit} disabled={!destination.trim() || volume < 500} />
+        <Button title="Request tanker delivery" icon="bus" onPress={submit} disabled={!hasArea || !destination.trim() || volume < 500} />
+        {!hasArea ? <Text style={[type.bodySm, { textAlign: 'center' }]}>Choose your delivery area above first.</Text> : null}
       </Card>
 
       {mine.length ? <SectionHeader title="My tanker deliveries" icon="bus" /> : null}

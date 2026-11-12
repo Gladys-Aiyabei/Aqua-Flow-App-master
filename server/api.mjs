@@ -556,16 +556,15 @@ async function route(ctx) {
     if (!email) fail(400, 'Enter a valid email address.');
     if (!phone) fail(400, 'Enter a valid Safaricom number for M-Pesa, e.g. 0712 345 678.');
     checkPasswordStrength(body.password);
-    const branch = await one(pool, 'select id from branches where id = $1 and active', [text(body.branchId)]);
-    if (!branch) fail(400, 'Choose your delivery area.');
+    // The delivery area is chosen later, from the customer's dashboard.
     await recordAttempt([[ipKey, MAX_SIGNUPS_PER_IP]], 60);
     const hash = await hashPassword(body.password);
     const user = await one(pool, `
       insert into users (email, name, phone, role, branch_id, password_hash) values ($1, $2, $3, 'customer', $4, $5)
-      on conflict (email) do nothing returning *`, [email, name, phone, branch.id, hash]);
+      on conflict (email) do nothing returning *`, [email, name, phone, null, hash]);
     if (!user) fail(409, 'An account with this email already exists. Log in instead.');
     await logActivity(pool, ctx, { userId: user.id, email, role: 'customer' }, {
-      action: 'auth.signup', entity: 'user', entityId: user.id, summary: `${name} signed up`, branchId: branch.id,
+      action: 'auth.signup', entity: 'user', entityId: user.id, summary: `${name} signed up`,
     });
     return { ok: true, email };
   }
@@ -629,6 +628,22 @@ async function route(ctx) {
 
   if (pathname === '/api/me' && method === 'GET') {
     return publicUser({ ...sess, id: sess.userId, branch_id: sess.branchId, must_change_password: sess.mustChangePassword });
+  }
+
+  // Customers pick (or change) their delivery area from their dashboard. Staff branches are set by the admin.
+  if (pathname === '/api/me' && method === 'PATCH') {
+    requireRole(sess, 'customer');
+    const body = await ctx.body();
+    const branch = await one(pool, 'select id, code, name from branches where id = $1 and active', [text(body.branchId)]);
+    if (!branch) fail(400, 'Choose one of the delivery areas.');
+    const user = await one(pool, 'update users set branch_id = $2 where id = $1 returning *', [sess.userId, branch.id]);
+    if (branch.id !== sess.branchId) {
+      await logActivity(pool, ctx, { ...sess, branchId: branch.id }, {
+        action: 'customer.area_set', entity: 'user', entityId: sess.userId, branchId: branch.id,
+        summary: `${sess.name} ${sess.branchId ? 'moved to' : 'chose'} ${branch.code} · ${branch.name}`,
+      });
+    }
+    return publicUser(user);
   }
 
   // New staff must replace the temporary password before doing anything else.
@@ -777,7 +792,7 @@ async function route(ctx) {
       customerName = sess.name;
       customerPhone = sess.phone;
       customerId = sess.userId;
-      branchId = sess.branchId || fail(400, 'Your account has no delivery area. Contact support.');
+      branchId = sess.branchId || fail(400, 'Choose your delivery area first (top of the Shop screen).');
       if (!address) fail(400, 'Enter a delivery address.');
     } else {
       customerName = text(body.customerName, 80) || 'Walk-in customer';
@@ -1066,7 +1081,7 @@ async function route(ctx) {
       };
       if (sess.role === 'customer') {
         Object.assign(d, { customer_name: sess.name, customer_phone: sess.phone, customer_id: sess.userId });
-        d.branch_id = sess.branchId || fail(400, 'Your account has no delivery area. Contact support.');
+        d.branch_id = sess.branchId || fail(400, 'Choose your delivery area first (top of the Shop screen).');
       } else {
         d.customer_name = text(body.customerName, 80) || fail(400, 'Enter the customer or site name.');
         d.customer_phone = optionalPhone(body.customerPhone, 'Customer phone');
