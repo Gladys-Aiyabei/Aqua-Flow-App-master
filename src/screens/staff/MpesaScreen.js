@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useApp } from '../../AppContext';
+import { notify, useApp } from '../../AppContext';
 import { colors, radius, type } from '../../theme';
-import { isToday, kes, prettyPhone, timeAgo } from '../../format';
+import { isToday, isValidKenyanPhone, kes, prettyPhone, timeAgo } from '../../format';
 import { Badge, Button, Card, ChoiceGrid, Empty, Field, Hero, Screen, SectionHeader, Segmented, Sheet, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
 
@@ -73,8 +73,17 @@ export default function MpesaScreen() {
         <Field label="Amount (KES)" prefix="KES" keyboardType="numeric" value={amount} onChangeText={setAmount} placeholder="2200" />
         <ChoiceGrid value={Number(amount)} onChange={(v) => setAmount(String(v))} options={QUICK} />
         <Field label="Reason" placeholder="e.g. 4× 20L refill" value={description} onChangeText={setDescription} />
-        <Button title="Send M-Pesa STK prompt" icon="flash" variant="mpesa" disabled={!phone || !Number(amount)}
-          onPress={() => setPush({ amount: Number(amount), description: description || 'Water payment', payerName: '' })} />
+        <Button title="Send M-Pesa STK prompt" icon="flash" variant="mpesa"
+          onPress={() => {
+            if (!isValidKenyanPhone(phone)) { notify('Customer number needed', 'Enter the M-Pesa number to send the prompt to, e.g. 0712 345 678.'); return; }
+            if (!(Number(amount) >= 1)) { notify('Amount needed', 'Enter the amount in KES, or tap one of the quick amounts.'); return; }
+            setPush({ amount: Number(amount), description: description || 'Water payment', payerName: '' });
+          }} />
+        {settings.mpesaMode !== 'live' ? (
+          <Text style={[type.bodySm, { textAlign: 'center', color: colors.amber }]}>
+            Test mode: no real money moves until the PayHero keys are added on the server.
+          </Text>
+        ) : null}
         <Button title="Record till / cash payment" icon="create-outline" variant="ghost" onPress={() => setManual(true)} />
       </Card>
 

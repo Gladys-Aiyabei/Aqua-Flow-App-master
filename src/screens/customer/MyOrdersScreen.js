@@ -57,6 +57,12 @@ export default function MyOrdersScreen() {
               <Text style={[type.headline, type.num, { color: colors.primaryDeep }]}>{kes(o.total)}</Text>
               {o.paymentStatus === 'paid'
                 ? <Badge status="paid" icon="checkmark-circle" label={o.mpesaRef ? `M-Pesa ${o.mpesaRef}` : 'Paid'} />
+                : o.paymentMethod === 'cash' && o.status !== 'cancelled' ? (
+                  <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                    <Badge label="Pay on delivery" icon="cash" color={colors.amber} bg={colors.amberSoft} />
+                    <Button small title="Pay with M-Pesa instead" icon="phone-portrait" variant="ghost" onPress={() => setPaying(o)} />
+                  </View>
+                )
                 : o.status !== 'cancelled' ? <Button small title="Pay with M-Pesa" icon="phone-portrait" variant="mpesa" onPress={() => setPaying(o)} /> : null}
             </View>
             {['new', 'confirmed'].includes(o.status) && o.paymentStatus !== 'paid' ? (
