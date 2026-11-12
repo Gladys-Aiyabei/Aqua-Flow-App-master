@@ -4,7 +4,7 @@ AquaFlow is a React Native + Expo app for managing water distribution operations
 
 ## Features
 
-- **Accounts:** customers sign up (name, email, M-Pesa phone, password, delivery area), then log in with email and password.
+- **Accounts:** customers sign up (name, email, M-Pesa phone, password), then log in with email and password. They choose their delivery area on their dashboard and can change it any time.
 - **Roles, enforced on the server:**
   - **Admin:** sees every branch; manages branches, staff, products, prices and settings; sees earnings and the activity log.
   - **Staff:** created by the admin and assigned to one branch (e.g. DIS-1). They only see and change that branch's orders, tanker missions, tanks, tankers, payments and reconciliations.
