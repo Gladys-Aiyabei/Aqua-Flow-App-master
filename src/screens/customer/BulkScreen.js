@@ -6,6 +6,7 @@ import { kes, litres, timeAgo } from '../../format';
 import { Badge, Button, Card, ChoiceGrid, Field, Hero, InfoRow, Screen, SectionHeader, ui } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
 import LocationPicker from '../../components/LocationPicker';
+import MapEmbed from '../../components/MapEmbed';
 import DeliveryAreaCard, { useDeliveryArea } from '../../components/DeliveryAreaCard';
 
 const STEPS = [
@@ -23,6 +24,7 @@ export default function BulkScreen() {
   const [destination, setDestination] = useState('');
   const [notes, setNotes] = useState('');
   const [spot, setSpot] = useState(null);
+  const [showMap, setShowMap] = useState(false);
   const [paying, setPaying] = useState(null);
   const { hasArea } = useDeliveryArea();
   const price = data?.settings?.bulkPricePerLitre ?? 0;
@@ -54,6 +56,10 @@ export default function BulkScreen() {
         <Field label="Or enter litres" keyboardType="numeric" value={String(volume || '')} onChangeText={(v) => setVolume(Number(v.replace(/\D/g, '')) || 0)} />
         <Field label="Delivery location" placeholder="Site / estate, road, landmark" value={destination} onChangeText={setDestination} />
         <LocationPicker value={spot} onChange={setSpot} />
+        {spot || showMap ? <MapEmbed latitude={spot?.latitude} longitude={spot?.longitude} address={destination} height={170} /> : null}
+        {!spot && destination.trim().length > 3 ? (
+          <Button small variant="ghost" icon="map-outline" title={showMap ? 'Hide map' : 'Check this address on the map'} onPress={() => setShowMap((v) => !v)} />
+        ) : null}
         <Field label="Notes (optional)" placeholder="Tank height, gate, preferred time" value={notes} onChangeText={setNotes} />
         <View style={[ui.inset, ui.between, { backgroundColor: colors.mintSoft }]}>
           <Text style={type.body}>Estimated cost</Text>

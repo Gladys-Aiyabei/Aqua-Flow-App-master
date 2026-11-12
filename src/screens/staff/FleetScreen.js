@@ -8,6 +8,7 @@ import {
   Badge, Button, Card, ChoiceGrid, Empty, Field, Hero, HeroStat, IconButton, InfoRow, Screen, SectionHeader, Segmented, Sheet, ui,
 } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
+import MapEmbed from '../../components/MapEmbed';
 
 const ACTIVE = ['scheduled', 'filling', 'en_route', 'discharging'];
 const NEXT_STEP = {
@@ -28,6 +29,7 @@ export default function FleetScreen() {
   const [mission, setMission] = useState(null); // {} new | delivery to assign
   const [truckForm, setTruckForm] = useState(null);
   const [paying, setPaying] = useState(null);
+  const [mapFor, setMapFor] = useState(null);
 
   const trucks = data?.trucks ?? [];
   const deliveries = data?.deliveries ?? [];
@@ -97,9 +99,13 @@ export default function FleetScreen() {
                   <View style={[ui.between, { gap: 8 }]}>
                     <View style={{ flex: 1 }}><InfoRow icon={d.latitude ? 'location' : 'location-outline'}>{d.destination}{d.latitude ? ' · pinned' : ''}</InfoRow></View>
                     {mapsUrl({ ...d, address: d.destination }) ? (
-                      <Button small variant="ghost" title="Navigate" icon="navigate" onPress={() => Linking.openURL(mapsUrl({ ...d, address: d.destination }))} />
+                      <>
+                        <Button small variant="ghost" title={mapFor === d.id ? 'Hide map' : 'Map'} icon="map-outline" onPress={() => setMapFor(mapFor === d.id ? null : d.id)} />
+                        <Button small variant="ghost" title="Navigate" icon="navigate" onPress={() => Linking.openURL(mapsUrl({ ...d, address: d.destination }))} />
+                      </>
                     ) : null}
                   </View>
+                  {mapFor === d.id ? <MapEmbed latitude={d.latitude} longitude={d.longitude} address={d.destination} /> : null}
                   {truck ? <InfoRow icon="bus">{truck.unit} · {truck.plate} · {truck.driverName}</InfoRow> : <InfoRow icon="alert-circle" color={colors.amber}>No tanker assigned yet</InfoRow>}
                   {d.notes ? <InfoRow icon="document-text">{d.notes}</InfoRow> : null}
                   {stepIndex >= 0 ? (

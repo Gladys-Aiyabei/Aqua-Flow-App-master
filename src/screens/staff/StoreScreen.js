@@ -8,6 +8,7 @@ import {
   Badge, Button, Card, Empty, Field, Hero, HeroStat, IconButton, InfoRow, Screen, SectionHeader, Segmented, Sheet, Stepper, Toggle, ui,
 } from '../../components/ui';
 import PaymentSheet from '../../components/PaymentSheet';
+import MapEmbed from '../../components/MapEmbed';
 
 const LOW_STOCK = 20;
 const ACCENT = { new: colors.primary, confirmed: colors.primaryDeep, dispatched: colors.cyan, delivered: colors.mintDeep, cancelled: colors.danger };
@@ -20,6 +21,7 @@ export default function StoreScreen() {
   const [dispatching, setDispatching] = useState(null);
   const [walkIn, setWalkIn] = useState(false);
   const [paying, setPaying] = useState(null);
+  const [mapFor, setMapFor] = useState(null);
 
   const products = data?.products ?? [];
   const orders = data?.orders ?? [];
@@ -116,8 +118,10 @@ export default function StoreScreen() {
           </View>
           <View style={[ui.between, { gap: 8 }]}>
             <View style={{ flex: 1 }}><InfoRow icon={o.latitude ? 'location' : 'location-outline'}>{o.address}{o.latitude ? ' · pinned' : ''}</InfoRow></View>
+            {mapsUrl(o) ? <Button small variant="ghost" title={mapFor === o.id ? 'Hide map' : 'Map'} icon="map-outline" onPress={() => setMapFor(mapFor === o.id ? null : o.id)} /> : null}
             {mapsUrl(o) ? <Button small variant="ghost" title="Navigate" icon="navigate" onPress={() => Linking.openURL(mapsUrl(o))} /> : null}
           </View>
+          {mapFor === o.id ? <MapEmbed latitude={o.latitude} longitude={o.longitude} address={o.address} /> : null}
           {o.customerPhone ? <InfoRow icon="call">{prettyPhone(o.customerPhone)}</InfoRow> : null}
           {o.paymentStatus !== 'paid' && o.paymentMethod === 'cash' ? <InfoRow icon="cash" color={colors.amber}>Collect {kes(o.total)} cash on delivery</InfoRow> : null}
           {o.rider ? <InfoRow icon="bicycle">Rider: {o.rider}</InfoRow> : null}

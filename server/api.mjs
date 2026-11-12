@@ -369,12 +369,20 @@ async function stateFor(sess, ctx) {
   const branchesP = rows(pool, 'select * from branches order by code');
 
   if (sess.role === 'customer') {
-    const [s, branches, products, orders, deliveries, feedback] = await Promise.all([
+    const [s, branches, products, orders, deliveries, feedback, payments] = await Promise.all([
       settingsP, branchesP,
       rows(pool, 'select * from products where active order by created_at, id'),
       rows(pool, 'select * from orders where customer_id = $1 order by created_at desc limit $2', [sess.userId, LIST_LIMIT]).then((o) => withItems(pool, o)),
       rows(pool, 'select * from deliveries where customer_id = $1 order by created_at desc limit $2', [sess.userId, LIST_LIMIT]),
       rows(pool, 'select * from feedback where customer_id = $1 order by created_at desc limit $2', [sess.userId, LIST_LIMIT]),
+      // Every payment for this customer's own orders and tanker deliveries, newest first.
+      rows(pool, `
+        select id, source, status, amount, phone, description, order_id, delivery_id, mpesa_receipt, result_desc, created_at, settled_at
+        from payments
+        where requested_by_user = $1
+           or order_id in (select id from orders where customer_id = $1)
+           or delivery_id in (select id from deliveries where customer_id = $1)
+        order by created_at desc limit $2`, [sess.userId, LIST_LIMIT]),
     ]);
     const home = branches.find((b) => b.id === sess.branchId);
     return {
@@ -385,6 +393,7 @@ async function stateFor(sess, ctx) {
       },
       branches: branches.filter((b) => b.active).map((b) => ({ id: b.id, code: b.code, name: b.name, area: b.area })),
       products: products.map(camel), orders, deliveries: deliveries.map(camel), feedback: feedback.map(camel),
+      payments: payments.map(camel),
     };
   }
 

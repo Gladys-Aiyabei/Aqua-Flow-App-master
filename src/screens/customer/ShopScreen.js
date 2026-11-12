@@ -8,6 +8,7 @@ import { Badge, Button, Card, ChoiceGrid, Empty, Field, Hero, Screen, SectionHea
 import PaymentSheet from '../../components/PaymentSheet';
 import DeliveryAreaCard, { useDeliveryArea } from '../../components/DeliveryAreaCard';
 import LocationPicker from '../../components/LocationPicker';
+import MapEmbed from '../../components/MapEmbed';
 
 export default function ShopScreen({ goToOrders }) {
   const { data, session, act, api } = useApp();
@@ -15,7 +16,8 @@ export default function ShopScreen({ goToOrders }) {
   const [checkout, setCheckout] = useState(false);
   const [address, setAddress] = useState('');
   const [notes, setNotes] = useState('');
-  const [spot, setSpot] = useState(null); // { latitude, longitude } from "Use my location"
+  const [spot, setSpot] = useState(null);
+  const [showMap, setShowMap] = useState(false); // { latitude, longitude } from "Use my location"
   const [payMethod, setPayMethod] = useState('mpesa');
   const [payPhone, setPayPhone] = useState('');
   const [placing, setPlacing] = useState(false);
@@ -151,6 +153,10 @@ export default function ShopScreen({ goToOrders }) {
         <Text style={type.caption}>Delivery</Text>
         <Field label="Delivery address" placeholder="Estate, street, house / gate number" value={address} onChangeText={setAddress} />
         <LocationPicker value={spot} onChange={setSpot} />
+        {spot || showMap ? <MapEmbed latitude={spot?.latitude} longitude={spot?.longitude} address={address} height={170} /> : null}
+        {!spot && address.trim().length > 3 ? (
+          <Button small variant="ghost" icon="map-outline" title={showMap ? 'Hide map' : 'Check this address on the map'} onPress={() => setShowMap((v) => !v)} />
+        ) : null}
         <Field label="Notes for the rider (optional)" placeholder="Call when at the gate" value={notes} onChangeText={setNotes} />
 
         <Text style={type.caption}>Payment</Text>
